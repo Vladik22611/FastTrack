@@ -3,6 +3,7 @@ import grpc
 import uuid
 from datetime import datetime
 from server.generated import tracking_pb2, tracking_pb2_grpc
+from config import SERVER_HOST, SERVER_PORT, UPDATE_INTERVAL
 
 
 async def generate_updates(driver_id):
@@ -18,14 +19,16 @@ async def generate_updates(driver_id):
             )
             lat += 0.001
             lng += 0.001
-            await asyncio.sleep(1)
+            await asyncio.sleep(UPDATE_INTERVAL)
     except asyncio.CancelledError:
         print("Update generator stopped")
         raise
 
 
 async def run_driver(driver_id):
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    async with grpc.aio.insecure_channel(
+        f"{SERVER_HOST}:{SERVER_PORT}"
+    ) as channel:
         stub = tracking_pb2_grpc.TrackingServiceStub(channel)
 
         try:

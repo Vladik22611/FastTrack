@@ -1,6 +1,7 @@
 import asyncio
 import grpc
 from server.generated import tracking_pb2, tracking_pb2_grpc
+from config import SERVER_HOST, SERVER_PORT
 
 status_mapping = {
     0: "UNKNOWN",
@@ -11,7 +12,9 @@ status_mapping = {
 
 
 async def track_driver():
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    async with grpc.aio.insecure_channel(
+        f"{SERVER_HOST}:{SERVER_PORT}"
+    ) as channel:
         stub = tracking_pb2_grpc.TrackingServiceStub(channel)
 
         try:

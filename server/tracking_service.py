@@ -5,11 +5,15 @@ from typing import AsyncIterable, AsyncIterator
 from datetime import datetime
 from google.protobuf.timestamp_pb2 import Timestamp
 from server.generated import tracking_pb2, tracking_pb2_grpc
+from config import (
+    REDIS_URL,
+    REDIS_MAX_CONNECTIONS,
+    REDIS_DRIVER_TTL,
+    UPDATE_INTERVAL,
+)
 
 
 class Tracking(tracking_pb2_grpc.TrackingServiceServicer):
-    DRIVER_TTL = 3600  # 1 час
-    UPDATE_INTERVAL = 1  # 1 сек
     status_mapping = {
         0: tracking_pb2.Status.STATUS_UNKNOWN,
         1: tracking_pb2.Status.STATUS_AVAILABLE,
@@ -17,9 +21,12 @@ class Tracking(tracking_pb2_grpc.TrackingServiceServicer):
         3: tracking_pb2.Status.STATUS_OFFLINE,
     }
 
-    def __init__(self, redis_url="redis://localhost:6379"):
+    def __init__(self, redis_url=REDIS_URL):
         self.redis = aioredis.from_url(
-            redis_url, encoding="utf-8", decode_responses=True, max_connections=200
+            redis_url,
+            encoding="utf-8",
+            decode_responses=True,
+            max_connections=REDIS_MAX_CONNECTIONS,
         )
 
     async def UpdateDriverLocation(
@@ -44,8 +51,9 @@ class Tracking(tracking_pb2_grpc.TrackingServiceServicer):
                     "drivers:geo", (r.longitude, r.latitude, r.driver_uuid)
                 )
 
-                await self.redis.expire(f"driver:{r.driver_uuid}", self.DRIVER_TTL)
-                await self.redis.expire("drivers:geo", self.DRIVER_TTL)
+                await self.redis.expire(f"driver:{r.driver_uuid}",
+                                        REDIS_DRIVER_TTL)
+                await self.redis.expire("drivers:geo", REDIS_DRIVER_TTL)
 
                 yield tracking_pb2.Ack()
         finally:
@@ -74,7 +82,8 @@ class Tracking(tracking_pb2_grpc.TrackingServiceServicer):
             driver_data = await self.redis.hgetall(f"driver:{driver_uuid}")
             redis_status = int(driver_data.get("status", "0"))
             status = self.status_mapping.get(
-                int(redis_status), tracking_pb2.Status.STATUS_UNKNOWN
+                int(redis_status),
+                tracking_pb2.Status.STATUS_UNKNOWN
             )
 
             if status != self.status_mapping[1]:
@@ -91,12 +100,13 @@ class Tracking(tracking_pb2_grpc.TrackingServiceServicer):
     ) -> AsyncIterable[tracking_pb2.DriverLocation]:
         while True:
             try:
-                driver = await self.redis.hgetall(f"driver:{request.driver_uuid}")
+                driver = await self.redis.hgetall(
+                    f"driver:{request.driver_uuid}")
                 if not driver:
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("Driver not found")
                     break
-                if driver['status'] == "0":
+                if driver["status"] == "0":
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("Driver is no longer available")
                     break
@@ -117,7 +127,7 @@ class Tracking(tracking_pb2_grpc.TrackingServiceServicer):
                     updated_at=now,
                 )
 
-                await asyncio.sleep(self.UPDATE_INTERVAL)
+                await asyncio.sleep(UPDATE_INTERVAL)
 
             except Exception as e:
                 context.set_code(grpc.StatusCode.INTERNAL)
