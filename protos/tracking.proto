@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package fasttrack;
+
+import "google/protobuf/timestamp.proto";
+
+
+service TrackingService {
+    rpc UpdateDriverLocation (stream DriverLocationUpdate) returns (stream Ack) {}
+    rpc GetAvailableDrivers (AreaFilter) returns (stream DriverInfo);
+    rpc StreamDriverLocation (GeoRequest) returns (stream DriverLocation) {}
+}
+
+enum Status {
+    STATUS_UNKNOWN = 0;
+    STATUS_AVAILABLE = 1;
+    STATUS_ON_TRIP = 2;
+    STATUS_OFFLINE = 3;
+}
+
+message DriverLocationUpdate {
+    string driver_uuid = 1;
+    double latitude = 2;
+    double longitude = 3;
+    Status status = 4;
+} 
+
+message Ack {}
+
+message AreaFilter {
+    double center_lat = 1;
+    double center_lng = 2;
+    double radius_km = 3;  // Радиус поиска
+}
+
+message DriverInfo {
+    string driver_uuid = 1;
+    double distance = 2;
+    Status status = 3;
+}
+
+message GeoRequest {
+    string driver_uuid = 1;
+}
+
+message DriverLocation {
+    string driver_uuid = 1;
+    double latitude = 2;
+    double longitude = 3;
+    Status status = 4;
+    google.protobuf.Timestamp updated_at = 5; 
+}
+
